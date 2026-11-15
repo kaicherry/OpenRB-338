@@ -271,6 +271,7 @@ fn handle(version: &str, info: &PanicHookInfo) {
             "OpenRB-338: the crash log could not be saved: {e}"
         )),
     }
+    #[cfg(not(target_os = "ios"))]
     if !no_dialog() {
         let _ = rfd::MessageDialog::new()
             .set_level(rfd::MessageLevel::Error)
