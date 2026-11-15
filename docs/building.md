@@ -564,6 +564,10 @@ UIKit backend does not meet:
   link do nothing, and `winit/rwh_06` is turned on directly in `crates/orb-ios`. `rfd` is
   desktop-only, so the crash hook's message box is the stderr line on iOS.
 
+`ORB_IOS_PLAY=1` in the app's environment presses Play at the start, for a run without a
+hand (the desktop's `--play`; `devicectl` passes it as `DEVICECTL_CHILD_ORB_IOS_PLAY=1`, or
+through `--environment-variables`).
+
 A device build has no attached stderr, so every step of the start writes
 `Documents/boot.log` (milliseconds since the start, the panic hook, and everything the `log`
 crate says at Info and above). Fetch it with
@@ -595,11 +599,11 @@ Two things make that bar ours rather than UIKit's default one. winit calls
 File/Edit/Format/View/Window/Help rather than joining them, so the bar reads File, Mods,
 Options, Help. iPadOS 26 and later shows this bar in the windowed modes and hides it until a
 swipe down from the top edge; `buildMenuWithBuilder:` runs when it is first built, so a device
-`boot.log` gains `menu bar built`. The panel keeps its own bar as well, because the system's
-bar is not there in full screen.
+`boot.log` gains `menu bar built`. The panel's own bar stays only in full screen: in a window
+`orb_ios_windowed` (the window against its screen) hides it, so there are not two.
 
 **The icon.** `ios/Assets.xcassets/AppIcon.appiconset` holds one opaque 1024x1024 picture;
-`actool` (in both scripts) turns it into the icon set, and its partial Info.plist supplies
+`actool` (in `scripts/ios-app.sh`) turns it into the icon set, and its partial Info.plist supplies
 `CFBundleIcons` and `CFBundleIconName`. The file came from `orb338.png` on the user's SSD,
 cropped to its artwork and filled to the edges: iOS masks the icon itself and does not accept
 a transparent margin.

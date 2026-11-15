@@ -67,6 +67,31 @@ void orb_ios_audio_session(void) {
     }
 }
 
+/// Whether the app's window is smaller than its screen: iPadOS shows its own menu bar in the
+/// windowed modes, and the panel's bar would be a second one there.
+int orb_ios_windowed(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *window = (UIWindowScene *)scene;
+        if (window.activationState != UISceneActivationStateForegroundActive) {
+            continue;
+        }
+        UIWindow *key = window.keyWindow ?: window.windows.firstObject;
+        if (key == nil) {
+            return 0;
+        }
+        CGRect frame = key.frame;
+        CGRect screen = window.screen.bounds;
+        return (fabs(frame.size.width - screen.size.width) > 1.0 ||
+                fabs(frame.size.height - screen.size.height) > 1.0)
+                   ? 1
+                   : 0;
+    }
+    return 0;
+}
+
 /// Attaches the windows winit has made so far to the app's window scene. Rust calls it once the
 /// panel exists; the scene delegate calls it when the scene connects.
 void orb_ios_attach_scene(void) {

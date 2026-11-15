@@ -114,6 +114,8 @@ unsafe extern "C" {
     fn orb_ios_audio_session();
     /// `src/audio_session.m`: puts winit's window in the app's window scene.
     fn orb_ios_attach_scene();
+    /// `src/audio_session.m`: 1 when the window is smaller than its screen.
+    fn orb_ios_windowed() -> std::os::raw::c_int;
     /// `src/menus.m`: the app delegate that builds the iPad's menu bar.
     fn orb_ios_install_menus();
     /// `src/menus.m`: the menu bar must be built again.
@@ -160,9 +162,11 @@ pub fn run() {
             boot::note("samples");
             let (link, audio) = Link::new(Arc::new(Tables::new()), samples.clone());
             boot::note("link");
+            let mut health = None;
             let stream = match orb_player::output::start(audio) {
                 Ok(s) => {
                     boot::note(&format!("audio: {} {:?}", s.device, s.config));
+                    health = Some(s.health());
                     Some(s)
                 }
                 // The panel runs without sound, as the desktop one does.
@@ -175,9 +179,17 @@ pub fn run() {
             // The kit the drum machines play; without it their pattern blocks are
             // placeholders and `start`'s new song has none to show.
             app.samples = samples;
+            // The panel asks for frames again only while it knows the stream runs (the meters
+            // and the playing step move on their own); without this the panel sat still.
+            app.audio_health = health;
             app.menu = true;
             app.settings = Settings::load();
             app.start(None);
+            // The desktop's hidden `--play`: a device run has no command line, and a panel that
+            // plays by itself is what a measurement (or a check of the meters) needs.
+            if std::env::var_os("ORB_IOS_PLAY").is_some() {
+                app.panel.press("transport.play", 0.0);
+            }
             app.enable_logo_anim();
             boot::note("app created");
             // SAFETY: main thread; the window winit made is a plain UIWindow until this.
@@ -208,6 +220,9 @@ struct Shell {
 #[cfg(target_os = "ios")]
 impl eframe::App for Shell {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // iPadOS shows its own menu bar in the windowed modes; the panel's bar is a second one.
+        // SAFETY: main thread; the answer is a look at the scene's window.
+        self.app.menu = unsafe { orb_ios_windowed() } == 0;
         // The iPad's menu bar runs the same commands the panel's menu bar does.
         for id in menus::take_actions() {
             if let Some(cmd) = self.app.menu_command(&id) {
