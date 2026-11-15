@@ -130,6 +130,15 @@ sed -e "s|@EXECUTABLE@|$exe|" -e "s|@BUNDLE_ID@|$bundle|" \
     -e "s|@MIN_OS@|$IPHONEOS_DEPLOYMENT_TARGET|" "$root/ios/Info.plist.in" > "$app/Info.plist"
 cp "$profile" "$app/embedded.mobileprovision"
 
+# The app icon: one 1024 picture (ios/Assets.xcassets) that actool turns into the icon set the
+# system reads, and the Info.plist keys that name it.
+partial=$(mktemp)
+xcrun actool "$root/ios/Assets.xcassets" --compile "$app" --platform iphoneos \
+    --minimum-deployment-target "$IPHONEOS_DEPLOYMENT_TARGET" --app-icon AppIcon \
+    --output-partial-info-plist "$partial" --errors --warnings >/dev/null
+/usr/libexec/PlistBuddy -c "Merge $partial" "$app/Info.plist" >/dev/null
+rm -f "$partial"
+
 ent=$(mktemp)
 trap 'rm -f "$profiles" "$ent"' EXIT
 cat > "$ent" <<PLIST

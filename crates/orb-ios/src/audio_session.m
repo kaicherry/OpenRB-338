@@ -78,7 +78,10 @@ void orb_ios_attach_scene(void) {
     }
 }
 
-/// The delegate `Info.plist` names: it exists to adopt the scene lifecycle, not to own a window.
+extern void orb_ios_build_menu_bar(id<UIMenuBuilder> builder);
+
+/// The delegate `Info.plist` names: it adopts the scene lifecycle and asks for the app's menus
+/// (with a scene delegate, UIKit asks the scene for the menu bar, not the app delegate).
 @interface OrbSceneDelegate : UIResponder <UIWindowSceneDelegate>
 @end
 
@@ -96,6 +99,10 @@ void orb_ios_attach_scene(void) {
     if ([scene isKindOfClass:[UIWindowScene class]]) {
         orb_attach((UIWindowScene *)scene);
     }
+}
+
+- (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder {
+    orb_ios_build_menu_bar(builder);
 }
 
 @end

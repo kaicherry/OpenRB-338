@@ -150,7 +150,6 @@ The Windows build of OpenRB-338 is a GUI-subsystem exe (task-111), see "The Wind
 | `scripts/macos-app.sh OUT_DIR UI [CLI]` | makes `OUT_DIR/OpenRB-338.app` from the binaries (Info.plist, icon, ad-hoc signature) |
 | `scripts/macos-dev-app.sh` | wraps `target/release/OpenRB-338` into `target/OpenRB-338.app` for everyday runs |
 | `scripts/ios-app.sh` | builds the iPad app (`orb-ios`) for `aarch64-apple-ios`, signs `dist/ios/OpenRB-338.app` and installs it on a paired iPad (below) |
-| `scripts/ios-sim.sh` | builds the iPad app for `aarch64-apple-ios-sim` and runs it in an iPad Simulator with stderr attached (below) |
 | `scripts/version.sh` | prints the version `YYYY.MMDD.HHMM` (the UTC build time from `SOURCE_DATE_EPOCH`, to the minute); `--time` the full time, `--epoch v2026.1028.1930` the `SOURCE_DATE_EPOCH` of a release tag |
 | `scripts/release-env.sh` | prints the build environment all packages of a release share (`SOURCE_DATE_EPOCH`, `ORB_BUILD_BRANCH`) |
 | `scripts/docker/linux-build.Dockerfile` | the Linux build image (Ubuntu 22.04, build tools, ALSA headers) |
@@ -519,8 +518,7 @@ ReBirth", and Files shows the app's Documents folder (`UIFileSharingEnabled`), w
 browser opens.
 
 ```sh
-scripts/ios-app.sh [--run] [--no-install]   # the iPad
-scripts/ios-sim.sh                          # an iPad simulator, stderr attached
+scripts/ios-app.sh [--run] [--no-install]
 ```
 
 `ios-app.sh` cross-compiles the crate for `aarch64-apple-ios`, wraps the binary in
@@ -531,9 +529,8 @@ names the iPad (default: the first paired iPad in `xcrun devicectl list devices`
 `ORB_IOS_BUNDLE_ID` the bundle id (default `com.rnsksoftronics.openrb338`), `ORB_IOS_SIGN` the
 identity and `ORB_IOS_PROFILE` the profile. The script prints the profile and identity it chose.
 
-Needs Xcode with the iPadOS SDK, `rustup target add aarch64-apple-ios` (and
-`aarch64-apple-ios-sim` for the Simulator), the iPad paired with this Mac and an Apple
-Development identity the chosen profile lists. The default profile is the newest unexpired
+Needs Xcode with the iPadOS SDK, `rustup target add aarch64-apple-ios`, the iPad paired with
+this Mac and an Apple Development identity the chosen profile lists. The default profile is the newest unexpired
 wildcard (`team.*`) that names the device and a certificate this Mac holds; Xcode creates one
 the first time it deploys to the iPad. Signing needs the login keychain the key lives in, so a
 background session (an agent's shell) cannot sign: run the script from Terminal once, and the
@@ -583,13 +580,33 @@ Crash reports (an `EXC_BREAKPOINT` among them) are in `systemCrashLogs`:
 --destination shot.png` and `xcrun devicectl device info lockState --device UDID` answer what
 the screen shows without asking.
 
-The Simulator (`scripts/ios-sim.sh`) runs the same bundle and is much faster to iterate on,
-but it does not enforce everything the device does (the scene trap is one), so the device
-stays the check that counts.
+**The menus.** `orb-ui`'s `App::menus` is the one definition of the app's menus: the panel's
+bar draws it, and `crates/orb-ios` turns it into rows (`src/menus.rs`) that `src/menus.m`
+builds `UIMenu`s from. A chosen item's id goes back through `App::menu_command`, so the iPad's
+menu bar and the panel's run the same commands: File (New/Open/Save with their shortcuts, Save
+As, Info, Export), Mods (the mods folder, with a submenu for files that share a name),
+Options (the two flags and the keyboard mode) and Help.
 
-Not there yet: an app icon, document types (opening an `.rbs` from Files or Mail), touch-sized
-knobs and browser rows, the on-screen keyboard (the browser's path bar needs one), and any way
-to close the window (iOS suspends the app instead).
+Two things make that bar ours rather than UIKit's default one. winit calls
+`UIApplicationMain(argc, argv, nil, nil)`, so the app would launch with no delegate class;
+`src/menus.m` defines `UIApplicationMain` itself (resolving UIKit's through `dlsym`), names an
+`OrbAppDelegate` and an `OrbApplication` subclass, and those two build the menus — setting
+`UIApplication.delegate` after launch is too late. And the four menus replace the system's
+File/Edit/Format/View/Window/Help rather than joining them, so the bar reads File, Mods,
+Options, Help. iPadOS 26 and later shows this bar in the windowed modes and hides it until a
+swipe down from the top edge; `buildMenuWithBuilder:` runs when it is first built, so a device
+`boot.log` gains `menu bar built`. The panel keeps its own bar as well, because the system's
+bar is not there in full screen.
+
+**The icon.** `ios/Assets.xcassets/AppIcon.appiconset` holds one opaque 1024x1024 picture;
+`actool` (in both scripts) turns it into the icon set, and its partial Info.plist supplies
+`CFBundleIcons` and `CFBundleIconName`. The file came from `orb338.png` on the user's SSD,
+cropped to its artwork and filled to the edges: iOS masks the icon itself and does not accept
+a transparent margin.
+
+Not there yet: document types (opening an `.rbs` from Files or Mail), touch-sized knobs and
+browser rows, the on-screen keyboard (the browser's path bar needs one), and any way to close
+the window (iOS suspends the app instead).
 
 ## The Windows installer (task-111)
 

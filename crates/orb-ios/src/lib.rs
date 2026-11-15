@@ -29,6 +29,21 @@ use orb_ui::model::Panel;
 #[cfg(target_os = "ios")]
 use orb_ui::settings::Settings;
 
+#[cfg(target_os = "ios")]
+mod menus;
+
+/// A line of the boot log, for the Objective-C shims (there is no attached stderr on a device).
+#[cfg(target_os = "ios")]
+#[unsafe(no_mangle)]
+pub extern "C" fn orb_ios_note(line: *const std::os::raw::c_char) {
+    if line.is_null() {
+        return;
+    }
+    // SAFETY: the caller passes a NUL-terminated string that outlives the call.
+    let line = unsafe { std::ffi::CStr::from_ptr(line) }.to_string_lossy();
+    boot::note(&line);
+}
+
 /// Why the app speaks through a file: a device launch hands back the exit code and no stderr,
 /// so every step of the start writes `Documents/boot.log`, which `devicectl device copy from`
 /// fetches. The milliseconds since the start say how long each step took.
@@ -99,6 +114,10 @@ unsafe extern "C" {
     fn orb_ios_audio_session();
     /// `src/audio_session.m`: puts winit's window in the app's window scene.
     fn orb_ios_attach_scene();
+    /// `src/menus.m`: the app delegate that builds the iPad's menu bar.
+    fn orb_ios_install_menus();
+    /// `src/menus.m`: the menu bar must be built again.
+    fn orb_ios_menus_changed();
 }
 
 /// The window's options, with the device limits the iPad's Metal adapter actually has: egui
@@ -163,6 +182,8 @@ pub fn run() {
             boot::note("app created");
             // SAFETY: main thread; the window winit made is a plain UIWindow until this.
             unsafe { orb_ios_attach_scene() };
+            // SAFETY: main thread, after UIKit has launched.
+            unsafe { orb_ios_install_menus() };
             Ok(Box::new(Shell {
                 app,
                 frames: 0,
@@ -187,6 +208,16 @@ struct Shell {
 #[cfg(target_os = "ios")]
 impl eframe::App for Shell {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // The iPad's menu bar runs the same commands the panel's menu bar does.
+        for id in menus::take_actions() {
+            if let Some(cmd) = self.app.menu_command(&id) {
+                self.app.command(cmd);
+            }
+        }
+        if menus::publish(self.app.menus(ui.ctx()), ui.ctx()) {
+            // SAFETY: main thread; UIKit builds the menus on its next turn.
+            unsafe { orb_ios_menus_changed() };
+        }
         if self.frames == 0 {
             boot::note("first frame");
             // SAFETY: main thread; the scene may have connected after the window was made.
