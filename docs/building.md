@@ -568,6 +568,12 @@ UIKit backend does not meet:
 hand (the desktop's `--play`; `devicectl` passes it as `DEVICECTL_CHILD_ORB_IOS_PLAY=1`, or
 through `--environment-variables`).
 
+**Touch targets.** Apple's smallest touch target is 44 points, and egui's widgets are a text
+line tall (20 points here), so a finger mostly missed the dialogs' buttons. The app creator
+gives every egui style a 44-point interact height with roomier padding, and the two places
+that size their own rectangles follow: the browser's rows and the error box's close button.
+The panel's controls are drawn rather than widget-built, so they keep their own layout.
+
 A device build has no attached stderr, so every step of the start writes
 `Documents/boot.log` (milliseconds since the start, the panic hook, and everything the `log`
 crate says at Info and above). Fetch it with

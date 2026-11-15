@@ -158,6 +158,14 @@ pub fn run() {
             // SAFETY: the app creator runs on the main thread, before cpal opens the unit.
             unsafe { orb_ios_audio_session() };
             cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
+            // A finger is not a mouse: Apple's smallest touch target is 44 points, egui's
+            // widgets are a text line tall. The panel's own controls are drawn, not widgets,
+            // so this reaches the dialogs and the windows.
+            cc.egui_ctx.all_styles_mut(|style| {
+                style.spacing.interact_size.y = 44.0;
+                style.spacing.button_padding = egui::vec2(14.0, 10.0);
+                style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+            });
             let samples = Some(rbm::standard::builtin_samples());
             boot::note("samples");
             let (link, audio) = Link::new(Arc::new(Tables::new()), samples.clone());
